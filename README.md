@@ -30,6 +30,9 @@ BlueSky APIにログインし、記事情報（タイトル・リンク・説明
 ## 動作環境
 Google Apps Script
 
+## 実際に動かしているbot紹介
+[Blueskyアイマスラブライブ新着動画botを作ってみた(+カスタムフィードも)](https://note.com/ayato_nananiji/n/n459ec7b29835)
+
 ## 参考記事
 - [GASを使ってblueskyで投稿をする方法](https://note.com/uwaaauwaaaa/n/nbcd279d4cf26)
 - [GASでBlueskyのBotをつくった備忘録](https://note.com/keiga/n/n527865bcf0d5)
