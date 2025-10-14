@@ -4,13 +4,13 @@
 YouTubeのRSSを取得し、スプレッドシートに保存した記事情報をBlueSkyに投稿するGoogle Apps Scriptプロジェクトです。
 
 ## 構成ファイル
-- `rss_process.gs`  
+- [`rss_process.gs`](rss_process.gs)    
   RSSフィードから記事情報を取得し、スプレッドシートに保存します。
 - [`clean_articles.gs`](clean_articles.gs)  
   スプレッドシート「articles」シートの内容を整理し、各RSSフィードごとに最新30件＋直近1週間分のデータのみ残します。
 - [`post_bluesky.gs`](post_bluesky.gs)  
   BlueSky APIを利用して、記事情報をBlueSkyに投稿します。サムネイル画像のアップロードにも対応しています。
-- `appsscript.json`  
+- [`appsscript.json`](appsscript.json)    
   GASプロジェクトの設定ファイル。
 
 ## 主な機能
