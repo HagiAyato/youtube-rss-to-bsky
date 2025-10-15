@@ -8,9 +8,19 @@ function postToBlueSky(text, userId, password, linkText, linkUrl, thumbUrl, desc
   if(!descText){
     descText = "";
   }
-  
+
   // ------------------------------------
-  // ① ハッシュタグ検出処理の追加
+  // 300文字制限処理の追加
+  // ------------------------------------
+  var MAX_CHARS = 300;
+  
+  if (text.length > MAX_CHARS) {
+    // 300文字目以降をカットし、末尾に「…」を追加
+    var text = text.substring(0, MAX_CHARS - 1) + '…';
+  }
+
+  // ------------------------------------
+  // ハッシュタグ検出処理の追加
   // ------------------------------------
   var hashtags = detectAndCreateHashtagFacets(text);
 
@@ -45,7 +55,8 @@ function postToBlueSky(text, userId, password, linkText, linkUrl, thumbUrl, desc
           description: descText // 必要に応じて説明を追加
         }
       },
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      langs: ["ja"] // 投稿言語設定
     }
   };
 
@@ -149,7 +160,8 @@ function getByteOffset(str, charIndex) {
 }
 
 function testPostToBlueSky() {
-  var text = 'BlueSkyへのテスト投稿です。 #タグ1 #dummy【】リンクはこちら: \n　#tag2　#タグ3 ＃タグ4,4';
+  //var text = 'BlueSkyへのテスト投稿です。 #タグ1 #dummy【】リンクはこちら: \n　#tag2　#タグ3 ＃タグ4,4';
+  var text = '012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789';
   var userId = PropertiesService.getScriptProperties().getProperty('bs_uid_imas');
   var password = PropertiesService.getScriptProperties().getProperty('bs_pass_imas');
   var linkText = 'テストリンクカード';
