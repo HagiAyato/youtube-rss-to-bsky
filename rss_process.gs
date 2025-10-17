@@ -1,6 +1,10 @@
 /**
  * フィード定義を取得
  * 参考：https://note.com/taatn0te/n/nacada2f4dfd2
+ * * @returns {Array<Object>} フィード情報オブジェクトの配列。各オブジェクトは以下のプロパティを持ちます：
+ * @returns {number} return.rss_number RSSフィードに割り当てられた番号
+ * @returns {string} return.name フィード名（Blueskyアカウント認証情報検索に使用）
+ * @returns {string} return.link RSSフィードのURL
  */
 function _getFeeds() {
   // feedsシートのA1:B最終行を取得する
@@ -18,6 +22,13 @@ function _getFeeds() {
 /**
  * 動画データから、タイトルとリンクアドレス抽出
  * 参考：Gemini
+ * * @param {XmlService.Element} entry RSSフィードの単一の<entry>要素。
+ * @returns {Object} 抽出された動画データ。以下のプロパティを持ちます：
+ * @returns {string} return.title 動画のタイトル
+ * @returns {string} return.link 動画の公開URL
+ * @returns {string} return.published 動画の公開日時（'yyyy-MM-ddThh:mm:ssXXX'形式、JST）
+ * @returns {string | null} return.thumbnail 動画のサムネイル画像のURL、存在しない場合はnull
+ * @returns {string | null} return.description 動画の説明文、存在しない場合はnull
  */
 function _getYTVideoDataFromEntry(entry) {
   const namespace = entry.getNamespace();
@@ -49,6 +60,14 @@ function _getYTVideoDataFromEntry(entry) {
   };
 }
 
+/**
+ * フィード名に基づき、「bluesky_define」シートから対応するBlueskyアカウントの
+ * ユーザーIDとパスワードのプロパティキーを取得します。
+ * * @param {string} feedName 検索対象のフィード名
+ * @returns {Object} ユーザーIDとパスワードのキーを含むオブジェクト。
+ * @returns {string} return.uid_key PropertiesServiceに登録されているユーザーIDのキー（見つからない場合は空文字列）
+ * @returns {string} return.pass_key PropertiesServiceに登録されているパスワードのキー（見つからない場合は空文字列）
+ */
 function _getUserIdAndPassword(feedName) {
   // bluesky_defineシートを取得
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("bluesky_define");
@@ -70,6 +89,7 @@ function _getUserIdAndPassword(feedName) {
 /**
  * メイン処理
  * RSSフィードから記事を取得し投稿
+ * * @returns {void} 
  */
 function main_process() {
   // フィード定義を取得

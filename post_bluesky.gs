@@ -1,3 +1,15 @@
+/**
+ * Blueskyに投稿（ポスト）を行うためのメイン関数。
+ * 投稿テキストの文字数制限（300文字）チェック、ハッシュタグのFacet生成、
+ * 外部リンクの埋め込み、サムネイル画像のアップロード、および言語設定を行います。
+ * * @param {string} text 投稿本文。300文字を超過する場合はカットされます。
+ * @param {string} userId Blueskyアカウントのハンドル名（例: @user.bsky.social）
+ * @param {string} password BlueskyアカウントのApp Passwordまたは通常のパスワード
+ * @param {string} linkText 埋め込む外部リンクカードのタイトル
+ * @param {string} linkUrl 埋め込む外部リンクのURI
+ * @param {string | null} thumbUrl 外部リンクカードに使用するサムネイル画像のURL。nullの場合はサムネイルなし。
+ * @param {string} descText 埋め込む外部リンクカードの説明文
+ */
 function postToBlueSky(text, userId, password, linkText, linkUrl, thumbUrl, descText) {
   // BlueSky APIのエンドポイント
   var loginUrl = 'https://bsky.social/xrpc/com.atproto.server.createSession';
@@ -107,7 +119,7 @@ function postToBlueSky(text, userId, password, linkText, linkUrl, thumbUrl, desc
 // ------------------------------------
 /**
  * テキストからハッシュタグを検出し、BlueskyのFacet構造を作成します。
- * 検出ルール: #から次の空白（半角/全角/改行）または本文末尾まで。
+ * 検出ルール: #から次の区切り文字（空白、句読点、括弧など）または本文末尾まで。
  * @param {string} text 投稿本文
  * @return {Array} Facetオブジェクトの配列
  */
