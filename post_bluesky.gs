@@ -48,7 +48,7 @@ function postToBlueSky(text, userId, password, linkText, linkUrl, thumbUrl, desc
   };
 
   // ログインリクエストの送信
-  var loginResponse = UrlFetchApp.fetch(loginUrl, loginOptions);
+  var loginResponse = fetchWithRetry(loginUrl, loginOptions);
   var loginData = JSON.parse(loginResponse.getContentText());
   var accessJwt = loginData.accessJwt;
 
@@ -84,7 +84,7 @@ function postToBlueSky(text, userId, password, linkText, linkUrl, thumbUrl, desc
   // サムネイルが指定されている場合、blobをアップロードしてレコードに添付
   if (thumbUrl) {
     try {
-      var imageResponse = UrlFetchApp.fetch(thumbUrl);
+      var imageResponse = fetchWithRetry(thumbUrl);
       var blob = imageResponse.getBlob();
 
       var uploadBlobOptions = {
@@ -96,7 +96,7 @@ function postToBlueSky(text, userId, password, linkText, linkUrl, thumbUrl, desc
         payload: blob.getBytes()
       };
 
-      var uploadBlobResponse = UrlFetchApp.fetch(uploadBlobUrl, uploadBlobOptions);
+      var uploadBlobResponse = fetchWithRetry(uploadBlobUrl, uploadBlobOptions);
       var uploadBlobData = JSON.parse(uploadBlobResponse.getContentText());
 
       // サムネイル情報をpostPayloadに設定
@@ -108,7 +108,7 @@ function postToBlueSky(text, userId, password, linkText, linkUrl, thumbUrl, desc
     }
   }
 
-  var postResponse = UrlFetchApp.fetch(postUrl, postOptions);
+  var postResponse = fetchWithRetry(postUrl, postOptions);
   var postData = JSON.parse(postResponse.getContentText());
 
   Logger.log(postData);

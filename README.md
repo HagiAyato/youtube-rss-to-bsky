@@ -12,6 +12,8 @@ YouTubeのRSSを取得し、スプレッドシートに保存した記事情報�
   BlueSky APIを利用して、記事情報をBlueSkyに投稿します。サムネイル画像のアップロードにも対応しています。
 - [`appsscript.json`](appsscript.json)    
   GASプロジェクトの設定ファイル。
+- [`util.gs`](util.gs)    
+  GASプロジェクト用ライブラリ。
 
 ## 主な機能
 

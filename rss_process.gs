@@ -99,7 +99,7 @@ function main_process() {
   feeds.forEach(feed => { // for...of ループよりforEachの方が高速な場合がある
     try {
       // RSSの読み込み
-      const xml = UrlFetchApp.fetch(feed.link).getContentText();
+      const xml = fetchWithRetry(feed.link).getContentText();
       const document = XmlService.parse(xml);
       const root = document.getRootElement();
       const namespace = root.getNamespace();
