@@ -94,9 +94,11 @@ function _getUserIdAndPassword(feedName) {
 function main_process() {
   // フィード定義を取得
   const feeds = _getFeeds();
+  // 全プロパティを取得
+  const allProps = PropertiesService.getScriptProperties().getProperties();
 
   // フィードごとに処理
-  feeds.forEach(feed => { // for...of ループよりforEachの方が高速な場合がある
+  for (const feed of feeds) {
     try {
       // RSSの読み込み
       const xml = fetchWithRetry(feed.link).getContentText();
@@ -120,14 +122,17 @@ function main_process() {
 
         // userID, password取得
         const credentials = _getUserIdAndPassword(feed.name);
-        const userId = PropertiesService.getScriptProperties().getProperty(credentials.uid_key);
-        const password = PropertiesService.getScriptProperties().getProperty(credentials.pass_key);
-
+        const userId = allProps[credentials.uid_key];
+        const password = allProps[credentials.pass_key];
+        if (!userId || !password) {
+          Logger.log(`警告: ${feed.name} の認証情報が見つかりません。`);
+          continue;
+        }
         // スプレッドシートに保存するデータを格納する配列
         const newArticles = [];
 
         // RSSから取得したデータと比較と保存
-        items.forEach(item => { // for...of ループよりforEachの方が高速な場合がある
+        for (const item of items) {
           try {
             const result = _getYTVideoDataFromEntry(item);
 
@@ -149,7 +154,7 @@ function main_process() {
           } catch (e) {
             Logger.log(`記事処理中にエラーが発生しました：${e.message}`);
           }
-        });
+        }
 
         // スプレッドシートへの保存をまとめて実行
         if (newArticles.length > 0) {
@@ -163,5 +168,5 @@ function main_process() {
     } catch (e) {
       Logger.log(`フィード処理中にエラーが発生しました：${e.message}`);
     }
-  });
+  }
 }
