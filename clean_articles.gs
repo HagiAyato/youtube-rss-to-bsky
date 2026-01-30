@@ -9,7 +9,12 @@ function cleanUpArticlesSheet() {
 
   // シートロックを取得
   var lock = LockService.getDocumentLock();
-  lock.waitLock(30000); // 最大30秒間ロック取得を試みる
+  // 30秒待機してロック。失敗した場合は競合回避のため終了
+  if (!lock.tryLock(30000)) {
+    Logger.log('他の処理が実行中のため、整理をスキップします。');
+    return;
+  }
+
 
   try {
     var data = sheet.getDataRange().getValues();
@@ -48,7 +53,9 @@ function cleanUpArticlesSheet() {
 
     // シートの内容をクリアして新しいデータを書き込む
     sheet.clearContents();
-    sheet.getRange(1, 1, newData.length, newData[0].length).setValues(newData);
+    if (newData.length > 0) {
+      sheet.getRange(1, 1, newData.length, newData[0].length).setValues(newData);
+    }
 
     Logger.log('シート "articles" の整理が完了しました。');
   } catch (e) {

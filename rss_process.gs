@@ -116,75 +116,82 @@ function main_process() {
   const articlesSheet = ss.getSheetByName('articles');
   if (!articlesSheet) throw new Error("シート'articles'が見つかりません。");
 
-  // 既存URLを読込
-  const lastRow = articlesSheet.getLastRow();
-  const existingUrls = lastRow > 0 
-    ? new Set(articlesSheet.getRange(1, 3, lastRow).getValues().flat())
-    : new Set();
+  // スプレッドシート全体のロックを取得
+  const lock = LockService.getDocumentLock();
+  try {
+    // 既存URLの読み取り前にロックを取得。これによりクリーンアップ中の中断を防ぐ
+    lock.waitLock(30000);
 
-  const allNewArticles = [];
+    // 既存URLを読込
+    const lastRow = articlesSheet.getLastRow();
+    const existingUrls = lastRow > 0 
+      ? new Set(articlesSheet.getRange(1, 3, lastRow).getValues().flat())
+      : new Set();
 
-  for (const feed of feeds) {
-    try {
-      console.log(`フィード： ${feed.name} の読込`);
-      // RSSの読み込み
-      const xml = fetchWithRetry(feed.link).getContentText();
-      const document = XmlService.parse(xml);
-      const root = document.getRootElement();
-      const namespace = root.getNamespace();
-      const items = root.getChildren('entry', namespace).reverse();
+    const allNewArticles = [];
 
-      // userID, password取得
-      const credentials = bskyDefs[feed.name];
-      if (!credentials) {
-        Logger.log(`警告: ${feed.name} の定義が見つかりません。`);
-        continue;
-      }
-      const userId = allProps[credentials.uid_key];
-      const password = allProps[credentials.pass_key];
+    for (const feed of feeds) {
+      try {
+        console.log(`フィード： ${feed.name} の読込`);
+        // RSSの読み込み
+        const xml = fetchWithRetry(feed.link).getContentText();
+        const document = XmlService.parse(xml);
+        const root = document.getRootElement();
+        const namespace = root.getNamespace();
+        const items = root.getChildren('entry', namespace).reverse();
 
-      if (!userId || !password) continue;
-
-      console.log(`フィード： ${feed.name} の要素分析`);
-      for (const item of items) {
-        try {
-          const result = _getYTVideoDataFromEntry(item);
-
-          // Setを使って高速に重複チェック（通信なし）
-          if (!existingUrls.has(result.link)) {
-            const todayStr = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss');
-
-            // BlueSkyに投稿
-            const text = `[${feed.name}]新着動画：\n${result.title}`;
-            postToBlueSky(text, userId, password, result.title, result.link, result.thumbnail, result.description);
-
-            // 保存用配列に追加
-            allNewArticles.push([feed.name, result.title, result.link, result.published, todayStr]);
-            // 同じ実行内での重複を避けるためSetにも追加
-            existingUrls.add(result.link);
-
-            console.log(`投稿完了: ${result.title}`);
-          }
-        } catch (e) {
-          Logger.log(`記事処理エラー: ${e.message}`);
+        // userID, password取得
+        const credentials = bskyDefs[feed.name];
+        if (!credentials) {
+          Logger.log(`警告: ${feed.name} の定義が見つかりません。`);
+          continue;
         }
-      }
-    } catch (e) {
-      Logger.log(`フィード処理エラー (${feed.name}): ${e.message}`);
-    }
-  }
+        const userId = allProps[credentials.uid_key];
+        const password = allProps[credentials.pass_key];
 
-  // 最後にまとめて書き込み（ロック時間を最小化）
-  if (allNewArticles.length > 0) {
-    const lock = LockService.getDocumentLock();
-    try {
+        if (!userId || !password) {
+          Logger.log(`エラー: ${feed.name} 投稿用のアカウント情報（userId/password）が見つかりません。`);
+          continue;
+        }
+
+        console.log(`フィード： ${feed.name} の要素分析`);
+        for (const item of items) {
+          try {
+            const result = _getYTVideoDataFromEntry(item);
+
+            // Setを使って高速に重複チェック（通信なし）
+            if (!existingUrls.has(result.link)) {
+              const todayStr = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss');
+
+              // BlueSkyに投稿
+              const text = `[${feed.name}]新着動画：\n${result.title}`;
+              postToBlueSky(text, userId, password, result.title, result.link, result.thumbnail, result.description);
+
+              // 保存用配列に追加
+              allNewArticles.push([feed.name, result.title, result.link, result.published, todayStr]);
+              // 同じ実行内での重複を避けるためSetにも追加
+              existingUrls.add(result.link);
+
+              console.log(`投稿完了: ${result.title}`);
+            }
+          } catch (e) {
+            Logger.log(`記事処理エラー: ${e.message}`);
+          }
+        }
+      } catch (e) {
+        Logger.log(`フィード処理エラー (${feed.name}): ${e.message}`);
+      }
+    }
+
+    // 最後にまとめて書き込み（ロック時間を最小化）
+    if (allNewArticles.length > 0) {
       lock.waitLock(30000);
       articlesSheet.getRange(articlesSheet.getLastRow() + 1, 1, allNewArticles.length, 5).setValues(allNewArticles);
       Logger.log(`${allNewArticles.length}件を保存しました。`);
-    } catch (e) {
-      Logger.log(`保存エラー: ${e.message}`);
-    } finally {
-      lock.releaseLock();
     }
+  } catch (e) {
+    Logger.log(`メイン処理エラー: ${e.message}`);
+  } finally {
+    lock.releaseLock();
   }
 }
