@@ -100,6 +100,7 @@ function main_process() {
   // フィードごとに処理
   for (const feed of feeds) {
     try {
+      console.log(`フィード： ${feed.name} の読込`);
       // RSSの読み込み
       const xml = fetchWithRetry(feed.link).getContentText();
       const document = XmlService.parse(xml);
@@ -111,6 +112,7 @@ function main_process() {
       const articlesSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('articles');
       if (!articlesSheet) throw new Error("シート'articles'が見つかりません。");
 
+      console.log(`フィード： ${feed.name} の要素分析`);
       // スプレッドシートロックを取得
       const lock = LockService.getDocumentLock();
       try {
