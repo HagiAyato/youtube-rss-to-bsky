@@ -87,6 +87,20 @@ function _getUserIdAndPassword(feedName) {
 }
 
 /**
+ * 全フィードのBluesky定義を一括取得（高速化用）
+ */
+function _getAllBlueskyDefinitions() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("bluesky_define");
+  if (!sheet) return {};
+  const data = sheet.getDataRange().getValues();
+  const defs = {};
+  data.forEach(row => {
+    defs[row[0]] = { uid_key: row[1], pass_key: row[2] };
+  });
+  return defs;
+}
+
+/**
  * メイン処理
  * RSSフィードから記事を取得し投稿
  * * @returns {void} 
@@ -96,8 +110,20 @@ function main_process() {
   const feeds = _getFeeds();
   // 全プロパティを取得
   const allProps = PropertiesService.getScriptProperties().getProperties();
+  const bskyDefs = _getAllBlueskyDefinitions(); // 事前に一括取得
+  
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const articlesSheet = ss.getSheetByName('articles');
+  if (!articlesSheet) throw new Error("シート'articles'が見つかりません。");
 
-  // フィードごとに処理
+  // 既存URLを読込
+  const lastRow = articlesSheet.getLastRow();
+  const existingUrls = lastRow > 0 
+    ? new Set(articlesSheet.getRange(1, 3, lastRow).getValues().flat())
+    : new Set();
+
+  const allNewArticles = [];
+
   for (const feed of feeds) {
     try {
       console.log(`フィード： ${feed.name} の読込`);
@@ -106,69 +132,59 @@ function main_process() {
       const document = XmlService.parse(xml);
       const root = document.getRootElement();
       const namespace = root.getNamespace();
-      const items = root.getChildren('entry', namespace).reverse(); // reverse()で逆順にして、新しい記事から処理
+      const items = root.getChildren('entry', namespace).reverse();
 
-      // スプレッドシートからデータを取得
-      const articlesSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('articles');
-      if (!articlesSheet) throw new Error("シート'articles'が見つかりません。");
+      // userID, password取得
+      const credentials = bskyDefs[feed.name];
+      if (!credentials) {
+        Logger.log(`警告: ${feed.name} の定義が見つかりません。`);
+        continue;
+      }
+      const userId = allProps[credentials.uid_key];
+      const password = allProps[credentials.pass_key];
+
+      if (!userId || !password) continue;
 
       console.log(`フィード： ${feed.name} の要素分析`);
-      // スプレッドシートロックを取得
-      const lock = LockService.getDocumentLock();
-      try {
-        // ロック実行
-        lock.waitLock(30000)
+      for (const item of items) {
+        try {
+          const result = _getYTVideoDataFromEntry(item);
 
-        // 既存のURLを配列で取得
-        const urls = articlesSheet.getRange(1, 3, articlesSheet.getLastRow()).getValues().flat(); // flat()で一次元配列にする
+          // Setを使って高速に重複チェック（通信なし）
+          if (!existingUrls.has(result.link)) {
+            const todayStr = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss');
 
-        // userID, password取得
-        const credentials = _getUserIdAndPassword(feed.name);
-        const userId = allProps[credentials.uid_key];
-        const password = allProps[credentials.pass_key];
-        if (!userId || !password) {
-          Logger.log(`警告: ${feed.name} の認証情報が見つかりません。`);
-          continue;
-        }
-        // スプレッドシートに保存するデータを格納する配列
-        const newArticles = [];
+            // BlueSkyに投稿
+            const text = `[${feed.name}]新着動画：\n${result.title}`;
+            postToBlueSky(text, userId, password, result.title, result.link, result.thumbnail, result.description);
 
-        // RSSから取得したデータと比較と保存
-        for (const item of items) {
-          try {
-            const result = _getYTVideoDataFromEntry(item);
+            // 保存用配列に追加
+            allNewArticles.push([feed.name, result.title, result.link, result.published, todayStr]);
+            // 同じ実行内での重複を避けるためSetにも追加
+            existingUrls.add(result.link);
 
-            // URLが一致しない場合のみ処理
-            if (!urls.includes(result.link)) { // some() より includes() の方が高速
-
-              // 現在日付時刻
-              const todayStr = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss');
-
-              // BlueSkyに投稿
-              const text = `[${feed.name}]新着動画：\n${result.title}`;
-              postToBlueSky(text, userId, password, result.title, result.link, result.thumbnail, result.description);
-
-              // スプレッドシートへの保存データを配列に格納
-              newArticles.push([feed.name, result.title, result.link, result.published, todayStr]);
-
-              console.log(`${feed.name}: ${result.title}`);
-            }
-          } catch (e) {
-            Logger.log(`記事処理中にエラーが発生しました：${e.message}`);
+            console.log(`投稿完了: ${result.title}`);
           }
+        } catch (e) {
+          Logger.log(`記事処理エラー: ${e.message}`);
         }
-
-        // スプレッドシートへの保存をまとめて実行
-        if (newArticles.length > 0) {
-          articlesSheet.getRange(articlesSheet.getLastRow() + 1, 1, newArticles.length, 5).setValues(newArticles);
-        }
-      } catch (e) {
-        Logger.log(`スプレッドシート処理中にエラーが発生しました：${e.message}`);
-      } finally {
-        lock.releaseLock(); // ロック解放
       }
     } catch (e) {
-      Logger.log(`フィード処理中にエラーが発生しました：${e.message}`);
+      Logger.log(`フィード処理エラー (${feed.name}): ${e.message}`);
+    }
+  }
+
+  // 最後にまとめて書き込み（ロック時間を最小化）
+  if (allNewArticles.length > 0) {
+    const lock = LockService.getDocumentLock();
+    try {
+      lock.waitLock(30000);
+      articlesSheet.getRange(articlesSheet.getLastRow() + 1, 1, allNewArticles.length, 5).setValues(allNewArticles);
+      Logger.log(`${allNewArticles.length}件を保存しました。`);
+    } catch (e) {
+      Logger.log(`保存エラー: ${e.message}`);
+    } finally {
+      lock.releaseLock();
     }
   }
 }
