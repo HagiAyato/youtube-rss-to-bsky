@@ -1,3 +1,8 @@
+// 名前空間を固定値として定義
+const NS_ATOM = XmlService.getNamespace('http://www.w3.org/2005/Atom');
+const NS_MEDIA = XmlService.getNamespace('http://search.yahoo.com/mrss/');
+const NS_YT = XmlService.getNamespace('http://www.youtube.com/xml/schemas/2015');
+
 /**
  * フィード定義を取得
  * 参考：https://note.com/taatn0te/n/nacada2f4dfd2
@@ -31,25 +36,27 @@ function _getFeeds() {
  * @returns {string | null} return.description 動画の説明文、存在しない場合はnull
  */
 function _getYTVideoDataFromEntry(entry) {
-  const namespace = entry.getNamespace();
-  const mediaNamespace = XmlService.getNamespace('http://search.yahoo.com/mrss/'); // media 名前空間を明示的に指定
-  const mediaGroup = entry.getChild('group', mediaNamespace);
+  // 必須要素の抽出
+  const title = entry.getChildText('title', NS_ATOM);
+  const videoId = entry.getChildText('videoId', NS_YT);
+  // link要素は href 属性から取得
+  const link = entry.getChild('link', NS_ATOM)?.getAttribute('href')?.getValue() || `https://www.youtube.com/watch?v=${videoId}`;
+  const published = entry.getChildText('published', NS_ATOM);
 
-  const title = entry.getChild('title', namespace).getText();
-  const link = entry.getChild('link', namespace).getAttribute('href').getValue();
-  const published = entry.getChild('published', namespace).getText();
-
+  // media:group 以下の拡張要素
+  const mediaGroup = entry.getChild('group', NS_MEDIA);
   let thumbnail = null;
   let description = null;
 
-  // mediaGroupが存在する場合のみ処理
   if (mediaGroup) {
-    thumbnail = mediaGroup.getChild('thumbnail', mediaNamespace)?.getAttribute('url')?.getValue() || null; // nullチェックを追加
-    description = mediaGroup.getChild('description', mediaNamespace)?.getText() || null; // nullチェックを追加
+    thumbnail = mediaGroup.getChild('thumbnail', NS_MEDIA)?.getAttribute('url')?.getValue() || null;
+    description = mediaGroup.getChild('description', NS_MEDIA)?.getText() || null;
   }
 
-  // publishedの日付を変換
-  const publishedDate = Utilities.formatDate(new Date(published), "JST", "yyyy-MM-dd'T'HH:mm:ssXXX");
+  // 日付のパース（JSTへ変換）
+  const publishedDate = published 
+    ? Utilities.formatDate(new Date(published), "JST", "yyyy-MM-dd'T'HH:mm:ssXXX")
+    : "";
 
   return {
     title: title,
@@ -137,8 +144,8 @@ function main_process() {
         const xml = fetchWithRetry(feed.link).getContentText();
         const document = XmlService.parse(xml);
         const root = document.getRootElement();
-        const namespace = root.getNamespace();
-        const items = root.getChildren('entry', namespace).reverse();
+        // 逆順にして古いものからチェック
+        const items = root.getChildren('entry', NS_ATOM).reverse();
 
         // userID, password取得
         const credentials = bskyDefs[feed.name];
