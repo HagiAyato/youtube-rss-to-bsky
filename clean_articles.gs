@@ -17,7 +17,10 @@ function cleanUpArticlesSheet() {
 
 
   try {
-    var data = sheet.getDataRange().getValues();
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 1) return; // データがなければ終了
+    
+    var data = sheet.getRange(1, 1, lastRow, 5).getValues(); // A列〜E列(5列)を取得
     var header = data.shift(); // ヘッダー行を抽出
     var groupedData = {};
     var today = new Date();
@@ -52,9 +55,11 @@ function cleanUpArticlesSheet() {
     }
 
     // シートの内容をクリアして新しいデータを書き込む
-    sheet.clearContents();
+    // 1〜5列目の既存データをクリア
+    sheet.getRange(1, 1, lastRow, 5).clearContent();
     if (newData.length > 0) {
-      sheet.getRange(1, 1, newData.length, newData[0].length).setValues(newData);
+      // 新しいデータを1〜5列目に書き込む
+      sheet.getRange(1, 1, newData.length, 5).setValues(newData);
     }
 
     Logger.log('シート "articles" の整理が完了しました。');

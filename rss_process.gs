@@ -193,7 +193,18 @@ function main_process() {
     // 最後にまとめて書き込み（ロック時間を最小化）
     if (allNewArticles.length > 0) {
       lock.waitLock(30000);
-      articlesSheet.getRange(articlesSheet.getLastRow() + 1, 1, allNewArticles.length, 5).setValues(allNewArticles);
+      // A1セルから下に向かって、データが途切れる直前の行を取得
+      // ※データが1件もない場合を想定して判定を入れます
+      var lastRowAE = articlesSheet.getRange("A1").getNextDataCell(SpreadsheetApp.Direction.DOWN).getRow();
+      // もしA列が完全に空（ヘッダーのみ）の場合、getNextDataCellはシートの最大行を返してしまうことがあるため、その対策
+      if (lastRowAE === articlesSheet.getMaxRows()) {
+        // A2が空ならヘッダーのみと判断
+        if (articlesSheet.getRange("A2").getValue() === "") {
+          lastRowAE = 1;
+        }
+      }
+
+      articlesSheet.getRange(lastRowAE + 1, 1, allNewArticles.length, 5).setValues(allNewArticles);
       Logger.log(`${allNewArticles.length}件を保存しました。`);
     }
   } catch (e) {
